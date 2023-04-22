@@ -1,5 +1,5 @@
 import torch
-
+import torch.fft
 
 def complex_mul(t1, t2):
     """complex number multiplication
@@ -48,8 +48,8 @@ def fast_conv1d(signal, kernel):
 
     device_ = signal.device
     pad_kernel = L_F - L_I
-    FDir = torch.rfft(torch.cat((kernel, torch.zeros(1, pad_kernel, device=device_)),
-                                dim=1), signal_ndim=1)
+    FDir = torch.fft.rfft(torch.cat((kernel, torch.zeros(1, pad_kernel, device=device_)),
+                                dim=1), dim=1)
 
     signal_sizes = [L_F]
     len_pad = (L_S - L_sig % L_S) % L_S
@@ -60,19 +60,18 @@ def fast_conv1d(signal, kernel):
     result = torch.zeros(batch, 1, offsets[-1] + L_F).to(device_)
     pad_slice = L_F - L_S
 
+
     for idx_fr in offsets:
         idx_to_in = idx_fr + L_S
         idx_to_out = idx_fr + L_F
         to_rfft = torch.cat((signal[:, 0, idx_fr:idx_to_in],
                              torch.zeros(batch, pad_slice, device=device_)), dim=1)
 
-        to_mul = torch.rfft(to_rfft, signal_ndim=1,
-                            normalized=True)
+        to_mul = torch.fft.rfft(to_rfft, dim=1, norm="forward")
+
         to_irfft = complex_mul(to_mul, FDir)
 
-        conved_slice = torch.irfft(to_irfft, signal_ndim=1,
-                                   signal_sizes=signal_sizes,
-                                   normalized=True)
+        conved_slice = torch.fft.irfft(to_irfft, n=signal_sizes[0], dim=1, norm="backward")
         result[:, 0, idx_fr: idx_to_out] += conved_slice
 
     return result[:, :, :L_sig]
