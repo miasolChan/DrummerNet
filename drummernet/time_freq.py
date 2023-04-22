@@ -6,7 +6,7 @@ import librosa
 import torch
 import torch.nn as nn
 
-cqt_filter_fft = librosa.constantq.__cqt_filter_fft
+cqt_filter_fft = librosa.core.constantq.__cqt_filter_fft
 
 
 def istft(stft_matrix, hop_length=None, win_length=None, window='hann',
@@ -167,7 +167,7 @@ class PseudoCqt:
             tuning = 0.0  # let's make it simple
 
         fft_basis, n_fft, _ = cqt_filter_fft(sr, fmin, n_bins, bins_per_octave,
-                                             tuning, filter_scale, norm, sparsity,
+                                             filter_scale, norm, sparsity,
                                              hop_length=hop_length, window=window)
 
         self.fft_basis = torch.tensor(np.array(np.abs(fft_basis.todense())), dtype=TCDTYPE,
@@ -192,11 +192,12 @@ class PseudoCqt:
         # thor:  lowercase variable names
         mag_stfts = torch.stft(y, self.n_fft,
                                hop_length=self.hop_length,
-                               window=self.window).pow(2).sum(-1)  # (batch, n_freq, time)
+                               window=self.window,return_complex=True).pow(2).sum(-1)  # (batch, n_freq, time)
         mag_stfts = torch.sqrt(mag_stfts + EPS)  # without EPS, backpropagating through CQT can yield NaN.
         # Project onto the pseudo-cqt basis
         # C_torch = torch.stack([torch.sparse.mm(self.fft_basis, D_torch_row) for D_torch_row in D_torch])
-        mag_melgrams = torch.matmul(self.fft_basis, mag_stfts)
+        mag_stfts = mag_stfts.squeeze().unsqueeze(0).transpose(0, 1)
+        mag_melgrams = torch.matmul(self.fft_basis.float(), mag_stfts.float())
 
         mag_melgrams /= torch.tensor(np.sqrt(self.n_fft), device=y.device)  # because `scale` is always True
         return to_log(mag_melgrams)
