@@ -323,7 +323,7 @@ class FastDrumSynthesizer(nn.Module):
         rv_insts = [self.drum_srcset.random_pick(note_name).to(device_) for note_name in DRUM_NAMES]
 
         igw = [1. / rv_i.abs().sum() for rv_i in rv_insts]
-        igw = torch.tensor(igw) / max(igw)
+        igw = torch.tensor(igw, device=device_) / max(igw)
 
         tracks = []
         for i in range(self.n_notes):
